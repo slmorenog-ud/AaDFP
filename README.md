@@ -140,7 +140,43 @@ HCT_Survival_Equity_System_Analysis/
 
 ## Final Version
 
--
+The final version of this project is a modular and scalable machine learning pipeline, structured as follows:
+
+```
+final_project/
+│
+├── data/
+│   ├── data_dictionary.csv
+│   └── train.csv
+│
+├── data_preprocessing/
+│   ├── __init__.py
+│   └── preprocessor.py
+│
+├── equity_analysis/
+│   └── __init__.py
+│
+├── fairness_calibration/
+│   └── __init__.py
+│
+├── feature_selection/
+│   └── __init__.py
+│
+├── predictive_modeling/
+│   ├── __init__.py
+│   └── model.py
+│
+├── system_outputs/
+│   ├── __init__.py
+│   └── reporter.py
+│
+├── uncertainty_quantification/
+│   └── __init__.py
+│
+└── main.py
+```
+
+This architecture is based on the 7-module design proposed in Workshop 2, with each module implemented as a separate Python package. This design promotes separation of concerns, making the system easier to develop, test, and maintain.
 
 ## Conclusions
 
