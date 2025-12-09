@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # AI Service - Machine Learning Pipeline
+  ai_service:
+    build: ./ai_service
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./ai_service/data:/app/data
+      - ./ai_service/models:/app/models
+    environment:
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Backend - API and Business Logic
+  backend:
+    build: ./backend
+    ports:
+      - "8001:8001"
+    environment:
+      - AI_SERVICE_URL=http://ai_service:8000
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - ai_service
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend - React Application
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
