@@ -11,14 +11,14 @@ import pickle
 import json
 from datetime import datetime
 
-# Import all modules
-from .preprocessing import DataPreprocessor
-from .equity import EquityAnalyzer
-from .features import FeatureSelector
-from .models import PredictiveModel, EnsembleModel
-from .calibration import FairnessCalibrator
-from .uncertainty import UncertaintyQuantifier
-from .outputs import OutputGenerator, PredictionResult
+# Import all modules (M1-M7)
+from .m1_preprocessing import DataPreprocessor
+from .m2_equity import EquityAnalyzer
+from .m3_features import FeatureSelector
+from .m4_models import PredictiveModel, EnsembleModel
+from .m5_calibration import FairnessCalibrator
+from .m6_uncertainty import UncertaintyQuantifier
+from .m7_outputs import OutputGenerator, PredictionResult
 
 
 class HCTPipeline:

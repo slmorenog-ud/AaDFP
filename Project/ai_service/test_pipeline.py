@@ -20,7 +20,7 @@ def test_preprocessing():
     print("Testing M1: Data Preprocessing")
     print("="*60)
     
-    from src.preprocessing import DataPreprocessor
+    from src.m1_preprocessing import DataPreprocessor
     
     preprocessor = DataPreprocessor()
     
@@ -51,7 +51,7 @@ def test_equity_analysis(df):
     print("Testing M2: Equity Analysis")
     print("="*60)
     
-    from src.equity import EquityAnalyzer
+    from src.m2_equity import EquityAnalyzer
     
     analyzer = EquityAnalyzer(group_col='race_group')
     
@@ -79,7 +79,7 @@ def test_feature_selection(X, y):
     print("Testing M3: Feature Selection")
     print("="*60)
     
-    from src.features import FeatureSelector
+    from src.m3_features import FeatureSelector
     
     selector = FeatureSelector()
     
@@ -101,7 +101,7 @@ def test_modeling(X, y, selected_features, weights=None):
     print("Testing M4: Predictive Modeling")
     print("="*60)
     
-    from src.models import PredictiveModel
+    from src.m4_models import PredictiveModel
     from sklearn.model_selection import train_test_split
     
     model = PredictiveModel()
@@ -152,7 +152,7 @@ def test_calibration(y_true, y_proba, groups):
     print("Testing M5: Fairness Calibration")
     print("="*60)
     
-    from src.calibration import FairnessCalibrator
+    from src.m5_calibration import FairnessCalibrator
     
     calibrator = FairnessCalibrator()
     
@@ -175,7 +175,7 @@ def test_uncertainty(model, X):
     print("Testing M6: Uncertainty Quantification")
     print("="*60)
     
-    from src.uncertainty import UncertaintyQuantifier
+    from src.m6_uncertainty import UncertaintyQuantifier
     
     uq = UncertaintyQuantifier()
     
@@ -207,7 +207,7 @@ def test_outputs():
     print("Testing M7: System Outputs")
     print("="*60)
     
-    from src.outputs import OutputGenerator, PredictionResult
+    from src.m7_outputs import OutputGenerator, PredictionResult
     
     output_gen = OutputGenerator()
     
