@@ -6,7 +6,8 @@ Provides REST API for the frontend and orchestrates calls to AI Service.
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from datetime import datetime
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 import hashlib
@@ -91,8 +92,47 @@ class PatientCreate(BaseModel):
     comorbidity_score: float = Field(default=0)
     karnofsky_score: float = Field(default=90)
     
+    @field_validator('year_hct')
+    @classmethod
+    def validate_year_hct(cls, v):
+        current_year = datetime.now().year
+        if v > current_year:
+            raise ValueError(f'Year cannot be greater than current year ({current_year})')
+        if v < 1980:
+            raise ValueError('Year must be 1980 or later')
+        return v
+    
+    @field_validator('age_at_hct')
+    @classmethod
+    def validate_age_at_hct(cls, v):
+        if v < 0 or v > 120:
+            raise ValueError('Age at HCT must be between 0 and 120')
+        return v
+    
+    @field_validator('donor_age')
+    @classmethod
+    def validate_donor_age(cls, v):
+        if v is not None and (v < 0 or v > 120):
+            raise ValueError('Donor age must be between 0 and 120')
+        return v
+    
+    @field_validator('comorbidity_score')
+    @classmethod
+    def validate_comorbidity_score(cls, v):
+        if v < 0 or v > 10:
+            raise ValueError('Comorbidity score must be between 0 and 10')
+        return v
+    
+    @field_validator('karnofsky_score')
+    @classmethod
+    def validate_karnofsky_score(cls, v):
+        if v < 0 or v > 100:
+            raise ValueError('Karnofsky score must be between 0 and 100')
+        return v
+    
     class Config:
         extra = "allow"
+
 
 
 class PatientResponse(BaseModel):
