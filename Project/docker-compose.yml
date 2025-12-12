@@ -7,7 +7,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./ai_service/data:/app/data
+      - ./ai_service/data:/app/data/raw
       - ./ai_service/models:/app/models
     environment:
       - PYTHONUNBUFFERED=1

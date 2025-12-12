@@ -4,7 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate, Link, useNavigate } from 'react
 // ==========================================
 // API Service
 // ==========================================
-const API_BASE = 'http://localhost:8001'
+const API_BASE = '/api'
 
 const api = {
     async request(endpoint, options = {}) {

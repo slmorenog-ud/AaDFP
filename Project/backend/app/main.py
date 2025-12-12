@@ -12,6 +12,8 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 import hashlib
 import secrets
+import httpx
+import os
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -342,68 +344,53 @@ async def get_patient(patient_id: str, user: Dict = Depends(require_auth)):
 # Prediction Endpoints
 # ==========================================
 
+# En Project/backend/app/main.py
+
 @app.post("/predictions", response_model=PredictionResponse, tags=["Predictions"])
 async def create_prediction(data: PredictionRequest, user: Dict = Depends(require_auth)):
-    """
-    Create a prediction for a patient.
-    
-    In production, this would call the AI Service.
-    For now, returns a mock prediction.
-    """
-    patient = patients_db.get(data.patient_id)
-    
-    if patient is None:
+    if data.patient_id not in patients_db:
         raise HTTPException(status_code=404, detail="Patient not found")
     
-    if patient["user_id"] != user["id"] and user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Access denied")
+    patient = patients_db[data.patient_id]
     
-    # TODO: Call AI Service for real prediction
-    # For now, generate mock prediction based on clinical data
-    clinical = patient["clinical_data"]
+    # --- INICIO DEL CAMBIO: CONEXIÓN REAL A IA ---
     
-    # Simple mock risk calculation
-    age = clinical.get("age_at_hct", 50)
-    comorbidity = clinical.get("comorbidity_score", 0)
-    karnofsky = clinical.get("karnofsky_score", 90)
-    
-    # Higher age and comorbidity increase risk, higher Karnofsky decreases it
-    base_risk = 0.3
-    age_factor = (age - 40) / 100 if age > 40 else 0
-    comorbidity_factor = comorbidity * 0.1
-    karnofsky_factor = (100 - karnofsky) / 200
-    
-    probability = min(1.0, max(0.0, base_risk + age_factor + comorbidity_factor + karnofsky_factor))
-    
-    if probability < 0.3:
-        risk_category = "Low"
-    elif probability < 0.7:
-        risk_category = "Medium"
-    else:
-        risk_category = "High"
-    
+    # 1. Definir la URL del servicio de IA
+    ai_service_url = os.getenv("AI_SERVICE_URL", "http://ai_service:8000")
+
+    # 2. Preparar los datos (combinar ID con datos clínicos)
+    ai_payload = {
+        "id": patient["id"],
+        **patient["clinical_data"]
+    }
+
+    # 3. Llamar al servicio de IA real
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(f"{ai_service_url}/predict", json=ai_payload, timeout=10.0)
+            response.raise_for_status() # Lanza error si falla (4xx, 5xx)
+            ai_result = response.json()
+        except Exception as e:
+            print(f"Error conectando a IA: {e}")
+            raise HTTPException(status_code=503, detail="Error de conexión con el servicio de IA")
+
+    # 4. Usar los datos REALES de la IA
     prediction_id = f"pred_{len(predictions_db) + 1}"
     
     prediction = {
         "id": prediction_id,
         "patient_id": data.patient_id,
         "user_id": user["id"],
-        "event_probability": probability,
-        "risk_category": risk_category,
-        "reliability_score": 0.75,
+        "event_probability": ai_result["event_probability"], # <--- DATO REAL
+        "risk_category": ai_result["risk_category"],       # <--- DATO REAL
+        "reliability_score": ai_result.get("reliability_score", 0.0),
         "created_at": datetime.now().isoformat()
     }
     
-    predictions_db[prediction_id] = prediction
+    # --- FIN DEL CAMBIO ---
     
-    return PredictionResponse(
-        id=prediction["id"],
-        patient_id=prediction["patient_id"],
-        event_probability=prediction["event_probability"],
-        risk_category=prediction["risk_category"],
-        reliability_score=prediction["reliability_score"],
-        created_at=prediction["created_at"]
-    )
+    predictions_db[prediction_id] = prediction
+    return prediction
 
 
 @app.get("/predictions", response_model=List[PredictionResponse], tags=["Predictions"])
