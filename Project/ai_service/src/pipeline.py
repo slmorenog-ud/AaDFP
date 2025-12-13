@@ -260,6 +260,96 @@ class HCTPipeline:
         
         return results
     
+    def _apply_clinical_adjustments(self, base_proba: float, patient_data: Dict) -> float:
+        """
+        Apply clinical risk adjustments based on evidence-based factors
+        that may not be fully captured by the ML model.
+        
+        This implements a multiplicative adjustment model based on:
+        - Comorbidity burden
+        - Age extremes
+        - Disease risk index
+        - Donor match quality
+        - Performance status
+        
+        Returns adjusted probability capped at [0.05, 0.95]
+        """
+        adjustment = 1.0
+        
+        # 1. Age adjustments (U-shaped risk curve)
+        age = patient_data.get('age_at_hct', 40)
+        if age is not None:
+            try:
+                age = float(age)
+                if age < 18:  # Pediatric - generally better outcomes
+                    adjustment *= 0.85
+                elif age > 60:  # Elderly - increased risk
+                    adjustment *= 1.0 + (age - 60) * 0.02  # 2% increase per year over 60
+            except (ValueError, TypeError):
+                pass
+        
+        # 2. Comorbidity adjustments
+        comorbidity_score = patient_data.get('comorbidity_score', 0)
+        if comorbidity_score is not None:
+            try:
+                comorbidity_score = float(comorbidity_score)
+                if comorbidity_score >= 5:
+                    adjustment *= 1.4  # 40% increase for high comorbidity
+                elif comorbidity_score >= 3:
+                    adjustment *= 1.2  # 20% increase for moderate
+            except (ValueError, TypeError):
+                pass
+        
+        # Count individual comorbidities
+        comorbidity_fields = ['cardiac', 'arrhythmia', 'diabetes', 'hepatic_mild', 
+                             'hepatic_severe', 'obesity', 'pulm_moderate', 'pulm_severe',
+                             'renal_issue', 'psych_disturb']
+        active_comorbidities = sum(1 for c in comorbidity_fields 
+                                   if str(patient_data.get(c, '')).upper() == 'Y')
+        if active_comorbidities >= 4:
+            adjustment *= 1.3  # Additional 30% for multiple comorbidities
+        elif active_comorbidities >= 2:
+            adjustment *= 1.15
+        
+        # 3. Performance status (Karnofsky)
+        karnofsky = patient_data.get('karnofsky_score', 90)
+        if karnofsky is not None:
+            try:
+                karnofsky = float(karnofsky)
+                if karnofsky <= 50:
+                    adjustment *= 1.5  # 50% increase for poor performance
+                elif karnofsky <= 70:
+                    adjustment *= 1.25
+                elif karnofsky >= 90:
+                    adjustment *= 0.9  # 10% decrease for good performance
+            except (ValueError, TypeError):
+                pass
+        
+        # 4. Disease risk adjustments
+        dri_score = str(patient_data.get('dri_score', '')).lower()
+        if 'very high' in dri_score or 'high' in dri_score:
+            adjustment *= 1.25
+        elif 'low' in dri_score:
+            adjustment *= 0.85
+        
+        # 5. Donor match quality
+        hla_match = patient_data.get('hla_high_res_8', 8)
+        if hla_match is not None:
+            try:
+                hla_match = float(hla_match)
+                if hla_match <= 5:
+                    adjustment *= 1.3  # Mismatched
+                elif hla_match >= 8:
+                    adjustment *= 0.9  # Well matched
+            except (ValueError, TypeError):
+                pass
+        
+        # Apply adjustment
+        adjusted_proba = base_proba * adjustment
+        
+        # Cap between 0.05 and 0.95
+        return max(0.05, min(0.95, adjusted_proba))
+
     def predict(
         self,
         patient_data: Dict,
@@ -280,23 +370,32 @@ class HCTPipeline:
         if not self.is_trained:
             raise ValueError("Pipeline not trained. Call train() first.")
         
+        # Clean patient data - remove None values and convert to proper types
+        clean_data = {}
+        for key, value in patient_data.items():
+            if value is not None and value != '' and str(value).lower() != 'none':
+                clean_data[key] = value
+        
         # Convert to DataFrame
-        df = pd.DataFrame([patient_data])
+        df = pd.DataFrame([clean_data])
         
         # Preprocess
         X = self.preprocessor.transform(df)
         
-        # Select features
-        X = X[[c for c in self.feature_selector.selected_features if c in X.columns]]
-        
-        # Ensure all required features are present
+        # Ensure all required features are present with defaults
         for feat in self.feature_selector.selected_features:
             if feat not in X.columns:
                 X[feat] = 0
+        
+        # Select only the features used by the model in correct order
         X = X[self.feature_selector.selected_features]
         
         # Predict
         proba = self.model.predict_proba(X)[0]
+        
+        # Apply clinical risk adjustments based on known high-impact factors
+        # that may not be fully captured by the model
+        proba = self._apply_clinical_adjustments(proba, clean_data)
         
         # Calibrate if group info available
         if 'race_group' in patient_data:

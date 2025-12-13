@@ -38,19 +38,88 @@ pipeline: Optional[HCTPipeline] = None
 # ==========================================
 
 class PatientData(BaseModel):
-    """Patient data for prediction."""
+    """
+    Complete patient data for prediction.
+    Includes all 60+ clinical variables from the data dictionary.
+    """
     id: str = Field(default="unknown", description="Patient identifier")
+    
+    # Basic Demographics
     age_at_hct: Optional[float] = Field(None, description="Age at transplant")
-    donor_age: Optional[float] = Field(None, description="Donor age")
     year_hct: Optional[int] = Field(None, description="Year of transplant")
     race_group: Optional[str] = Field(None, description="Race/ethnicity")
-    dri_score: Optional[str] = Field(None, description="Disease risk index")
-    conditioning_intensity: Optional[str] = Field(None, description="Conditioning intensity")
-    graft_type: Optional[str] = Field(None, description="Graft type")
+    ethnicity: Optional[str] = Field(None, description="Ethnicity")
+    
+    # Donor Information
+    donor_age: Optional[float] = Field(None, description="Donor age")
     donor_related: Optional[str] = Field(None, description="Donor relationship")
-    comorbidity_score: Optional[float] = Field(None, description="Comorbidity score")
+    sex_match: Optional[str] = Field(None, description="Donor/recipient sex match")
+    
+    # Disease Information
+    prim_disease_hct: Optional[str] = Field(None, description="Primary disease for HCT")
+    dri_score: Optional[str] = Field(None, description="Disease risk index")
+    cyto_score: Optional[str] = Field(None, description="Cytogenetic score")
+    cyto_score_detail: Optional[str] = Field(None, description="Detailed cytogenetics")
+    mrd_hct: Optional[str] = Field(None, description="MRD at time of HCT")
+    
+    # Transplant Details
+    graft_type: Optional[str] = Field(None, description="Graft type")
+    prod_type: Optional[str] = Field(None, description="Product type")
+    conditioning_intensity: Optional[str] = Field(None, description="Conditioning intensity")
+    tbi_status: Optional[str] = Field(None, description="TBI status")
+    in_vivo_tcd: Optional[str] = Field(None, description="In-vivo T-cell depletion")
+    gvhd_proph: Optional[str] = Field(None, description="GVHD prophylaxis")
+    rituximab: Optional[str] = Field(None, description="Rituximab in conditioning")
+    melphalan_dose: Optional[str] = Field(None, description="Melphalan dose")
+    
+    # HLA Matching - High Resolution
+    hla_match_a_high: Optional[float] = Field(None, description="HLA-A high res match")
+    hla_match_b_high: Optional[float] = Field(None, description="HLA-B high res match")
+    hla_match_c_high: Optional[float] = Field(None, description="HLA-C high res match")
+    hla_match_drb1_high: Optional[float] = Field(None, description="HLA-DRB1 high res match")
+    hla_match_dqb1_high: Optional[float] = Field(None, description="HLA-DQB1 high res match")
+    hla_high_res_6: Optional[float] = Field(None, description="6-locus high res match")
+    hla_high_res_8: Optional[float] = Field(None, description="8-locus high res match")
+    hla_high_res_10: Optional[float] = Field(None, description="10-locus high res match")
+    
+    # HLA Matching - Low Resolution
+    hla_match_a_low: Optional[float] = Field(None, description="HLA-A low res match")
+    hla_match_b_low: Optional[float] = Field(None, description="HLA-B low res match")
+    hla_match_c_low: Optional[float] = Field(None, description="HLA-C low res match")
+    hla_match_drb1_low: Optional[float] = Field(None, description="HLA-DRB1 low res match")
+    hla_match_dqb1_low: Optional[float] = Field(None, description="HLA-DQB1 low res match")
+    hla_low_res_6: Optional[float] = Field(None, description="6-locus low res match")
+    hla_low_res_8: Optional[float] = Field(None, description="8-locus low res match")
+    hla_low_res_10: Optional[float] = Field(None, description="10-locus low res match")
+    hla_nmdp_6: Optional[float] = Field(None, description="NMDP 6-locus match")
+    
+    # T-Cell Epitope Matching
+    tce_match: Optional[str] = Field(None, description="T-cell epitope matching")
+    tce_imm_match: Optional[str] = Field(None, description="TCE immunogenicity match")
+    tce_div_match: Optional[str] = Field(None, description="TCE diversity match")
+    
+    # CMV Status
+    cmv_status: Optional[str] = Field(None, description="Donor/recipient CMV serostatus")
+    
+    # Performance Scores
     karnofsky_score: Optional[float] = Field(None, description="Karnofsky score")
-    # Add more fields as needed
+    comorbidity_score: Optional[float] = Field(None, description="Comorbidity score")
+    
+    # Comorbidities
+    cardiac: Optional[str] = Field(None, description="Cardiac condition")
+    arrhythmia: Optional[str] = Field(None, description="Arrhythmia")
+    diabetes: Optional[str] = Field(None, description="Diabetes")
+    hepatic_mild: Optional[str] = Field(None, description="Mild hepatic condition")
+    hepatic_severe: Optional[str] = Field(None, description="Severe hepatic condition")
+    obesity: Optional[str] = Field(None, description="Obesity")
+    peptic_ulcer: Optional[str] = Field(None, description="Peptic ulcer")
+    prior_tumor: Optional[str] = Field(None, description="Prior solid tumor")
+    psych_disturb: Optional[str] = Field(None, description="Psychiatric disturbance")
+    pulm_moderate: Optional[str] = Field(None, description="Moderate pulmonary")
+    pulm_severe: Optional[str] = Field(None, description="Severe pulmonary")
+    renal_issue: Optional[str] = Field(None, description="Renal condition")
+    rheum_issue: Optional[str] = Field(None, description="Rheumatologic condition")
+    vent_hist: Optional[str] = Field(None, description="History of ventilation")
     
     class Config:
         extra = "allow"  # Allow additional fields
@@ -61,6 +130,7 @@ class PredictionResponse(BaseModel):
     patient_id: str
     event_probability: float
     risk_category: str
+    confidence_level: str  # 'high', 'moderate', 'borderline (near X)'
     confidence_lower: Optional[float]
     confidence_upper: Optional[float]
     reliability_score: float
@@ -83,7 +153,7 @@ class TrainRequest(BaseModel):
     """Request for training."""
     data_path: str
     model_type: str = "gbm"
-    n_features: int = 25
+    n_features: int = 45  # Increased to include all comorbidities and clinical features
 
 
 class ModelInfo(BaseModel):
@@ -167,6 +237,7 @@ async def predict_single(patient: PatientData):
             patient_id=result.patient_id,
             event_probability=result.event_probability,
             risk_category=result.risk_category,
+            confidence_level=result.confidence_level,
             confidence_lower=result.confidence_lower,
             confidence_upper=result.confidence_upper,
             reliability_score=result.reliability_score,

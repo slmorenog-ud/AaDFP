@@ -310,20 +310,53 @@ class DataPreprocessor:
         Returns:
             X: Preprocessed features
         """
-        # Impute
-        df = self.impute_missing(df, strategy='simple')
+        df = df.copy()
+        
+        # Ensure all expected columns exist (fill with defaults)
+        for col in self.categorical_columns:
+            if col not in df.columns:
+                df[col] = 'Unknown'
+        
+        for col in self.numerical_columns:
+            if col not in df.columns:
+                df[col] = 0.0
+        
+        # Convert numeric columns to proper type
+        for col in self.numerical_columns:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+        
+        # Convert categorical columns to string
+        for col in self.categorical_columns:
+            if col in df.columns:
+                df[col] = df[col].astype(str).fillna('Unknown').replace('None', 'Unknown').replace('nan', 'Unknown')
         
         # Create features
         df = self.create_features(df)
         
-        # Encode
-        df = self.encode_categorical(df, fit=False)
+        # Encode categorical (use existing encoders)
+        for col in self.categorical_columns:
+            if col in df.columns and col in self.label_encoders:
+                df[col] = df[col].astype(str)
+                # Handle unseen values
+                df[col] = df[col].apply(
+                    lambda x: x if x in self.label_encoders[col].classes_ else 'Unknown'
+                )
+                df[col] = self.label_encoders[col].transform(df[col])
         
-        # Normalize
-        df = self.normalize_features(df, fit=False)
+        # Normalize numerical features (use existing scaler)
+        if self.scaler is not None:
+            cols_to_scale = [c for c in self.numerical_columns if c in df.columns]
+            # Make sure we have the same columns as training
+            for col in cols_to_scale:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+            if cols_to_scale:
+                df[cols_to_scale] = self.scaler.transform(df[cols_to_scale])
         
         # Select features
         all_features = self.categorical_columns + self.numerical_columns
-        X = df[[c for c in all_features if c in df.columns]]
+        available_features = [c for c in all_features if c in df.columns]
+        X = df[available_features]
         
         return X

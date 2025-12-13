@@ -1,4 +1,10 @@
-# <div align="center">System Analysis Project: CIBMTR Equity in post-HCT survival predictions </div>
+# <div align="center">HCT Survival Prediction System</div>
+## <div align="center">CIBMTR Equity in Post-HCT Survival Predictions</div>
+
+---
+
+> **Research Foundation**  
+> This system is the culmination of extensive research conducted through a series of workshops exploring system design, robust architecture, simulation validation, and machine learning equity. The 7-module ML pipeline architecture emerged from this investigation, ensuring a scientifically grounded approach to fair and accurate survival predictions.
 
 ---
 
@@ -54,6 +60,33 @@ The **AI Service** is a specialized, containerized service that encapsulates the
         6.  **M6: Uncertainty Quantification**
         7.  **M7: System Outputs**
     -   Is designed to be scalable and maintainable, allowing for easy retraining and deployment of new models.
+
+---
+
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Project README](Project/README.md) | Complete technical documentation |
+| [User Guide](Project/docs/USER_GUIDE.md) | User stories, workflows, and screen guide |
+| [Architecture](Project/docs/ARCHITECTURE.md) | Mermaid diagrams and system design |
+| [Deployment](Project/docs/DEPLOYMENT.md) | Production deployment guide |
+| [Contributing](Project/docs/CONTRIBUTING.md) | Contributor guidelines |
+| [Changelog](Project/docs/CHANGELOG.md) | Version history |
+| [AI Service](Project/ai_service/README.md) | ML pipeline technical details |
+| [Backend](Project/backend/README.md) | API endpoints and database models |
+| [Frontend](Project/frontend/README.md) | UI components and validation |
+
+---
+
+## 🚀 Quick Start
+
+```bash
+cd Project
+docker-compose up --build
+```
+
+Access the application at: http://localhost
 
 ---
 

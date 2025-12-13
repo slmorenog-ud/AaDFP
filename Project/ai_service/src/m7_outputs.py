@@ -24,6 +24,7 @@ class PredictionResult:
     patient_id: str
     event_probability: float
     risk_category: str
+    confidence_level: str  # 'high', 'moderate', 'borderline'
     confidence_lower: Optional[float]
     confidence_upper: Optional[float]
     reliability_score: float
@@ -147,13 +148,35 @@ class OutputGenerator:
         Returns:
             PredictionResult object
         """
-        # Determine risk category
-        if probability < 0.3:
+        # Thresholds for risk categories
+        THRESHOLD_LOW_MEDIUM = 0.28
+        THRESHOLD_MEDIUM_HIGH = 0.55
+        BORDERLINE_MARGIN = 0.05  # 5% margin for borderline cases
+        
+        # Determine risk category with clinically-adjusted thresholds
+        if probability < THRESHOLD_LOW_MEDIUM:
             risk_category = 'Low'
-        elif probability < 0.7:
+        elif probability < THRESHOLD_MEDIUM_HIGH:
             risk_category = 'Medium'
         else:
             risk_category = 'High'
+        
+        # Determine confidence level based on distance from thresholds
+        dist_to_low_medium = abs(probability - THRESHOLD_LOW_MEDIUM)
+        dist_to_medium_high = abs(probability - THRESHOLD_MEDIUM_HIGH)
+        min_distance = min(dist_to_low_medium, dist_to_medium_high)
+        
+        if min_distance < BORDERLINE_MARGIN:
+            # Close to a threshold - borderline case
+            if dist_to_low_medium < dist_to_medium_high:
+                adjacent = 'Medium' if probability < THRESHOLD_LOW_MEDIUM else 'Low'
+            else:
+                adjacent = 'High' if probability < THRESHOLD_MEDIUM_HIGH else 'Medium'
+            confidence_level = f'borderline (near {adjacent})'
+        elif min_distance < BORDERLINE_MARGIN * 2:
+            confidence_level = 'moderate'
+        else:
+            confidence_level = 'high'
         
         # Extract top risk factors from SHAP
         top_risk_factors = []
@@ -164,6 +187,7 @@ class OutputGenerator:
             patient_id=patient_id,
             event_probability=float(probability),
             risk_category=risk_category,
+            confidence_level=confidence_level,
             confidence_lower=float(confidence_interval[0]) if confidence_interval else None,
             confidence_upper=float(confidence_interval[1]) if confidence_interval else None,
             reliability_score=float(reliability),

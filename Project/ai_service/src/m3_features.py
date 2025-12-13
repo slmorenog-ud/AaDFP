@@ -58,6 +58,42 @@ class FeatureSelector:
         'year_hct',
     ]
     
+    # Comorbidities - FORCE include these even if low prevalence
+    # Clinically critical for risk assessment
+    FORCED_COMORBIDITY_FEATURES = [
+        'cardiac',
+        'arrhythmia', 
+        'diabetes',
+        'hepatic_mild',
+        'hepatic_severe',
+        'obesity',
+        'peptic_ulcer',
+        'prior_tumor',
+        'psych_disturb',
+        'pulm_moderate',
+        'pulm_severe',
+        'renal_issue',
+        'rheum_issue',
+        'vent_hist',
+    ]
+    
+    # Additional clinical features to include
+    ADDITIONAL_CLINICAL_FEATURES = [
+        'cmv_status',
+        'tbi_status',
+        'in_vivo_tcd',
+        'gvhd_proph',
+        'prod_type',
+        'rituximab',
+        'cyto_score_detail',
+        'hla_low_res_6',
+        'hla_low_res_8',
+        'hla_nmdp_6',
+        'tce_match',
+        'tce_imm_match',
+        'age_donor_diff',
+    ]
+    
     # Features that might introduce bias if not handled carefully
     SENSITIVE_FEATURES = [
         'race_group',
@@ -200,7 +236,8 @@ class FeatureSelector:
         df_original: Optional[pd.DataFrame] = None,
         n_features: int = 20,
         method: str = 'combined',
-        group_col: str = 'race_group'
+        group_col: str = 'race_group',
+        force_comorbidities: bool = True
     ) -> List[str]:
         """
         Select top features using multiple strategies.
@@ -212,17 +249,36 @@ class FeatureSelector:
             n_features: Number of features to select
             method: 'clinical', 'statistical', 'ml', or 'combined'
             group_col: Demographic group column
+            force_comorbidities: Always include comorbidity features
         
         Returns:
             List of selected feature names
         """
         available_features = X.columns.tolist()
         
+        # Start with forced comorbidity features (clinically critical)
+        forced_features = []
+        if force_comorbidities:
+            for feat in self.FORCED_COMORBIDITY_FEATURES:
+                if feat in available_features:
+                    forced_features.append(feat)
+            # Also add comorbidity_score if available
+            if 'comorbidity_score' in available_features:
+                forced_features.append('comorbidity_score')
+        
+        # Add additional clinical features
+        for feat in self.ADDITIONAL_CLINICAL_FEATURES:
+            if feat in available_features and feat not in forced_features:
+                forced_features.append(feat)
+        
         # Clinical domain features
         clinical_features = self.get_clinical_domain_features(available_features)
+        for feat in clinical_features:
+            if feat not in forced_features:
+                forced_features.append(feat)
         
         if method == 'clinical':
-            self.selected_features = clinical_features[:n_features]
+            self.selected_features = forced_features[:n_features]
             return self.selected_features
         
         # Statistical importance
@@ -230,7 +286,13 @@ class FeatureSelector:
         
         if method == 'statistical':
             sorted_features = sorted(stat_importance.items(), key=lambda x: x[1], reverse=True)
-            self.selected_features = [f[0] for f in sorted_features[:n_features]]
+            selected = forced_features.copy()
+            for f, _ in sorted_features:
+                if f not in selected:
+                    selected.append(f)
+                if len(selected) >= n_features:
+                    break
+            self.selected_features = selected
             return self.selected_features
         
         # ML importance
@@ -238,7 +300,13 @@ class FeatureSelector:
         
         if method == 'ml':
             sorted_features = sorted(ml_importance.items(), key=lambda x: x[1], reverse=True)
-            self.selected_features = [f[0] for f in sorted_features[:n_features]]
+            selected = forced_features.copy()
+            for f, _ in sorted_features:
+                if f not in selected:
+                    selected.append(f)
+                if len(selected) >= n_features:
+                    break
+            self.selected_features = selected
             return self.selected_features
         
         # Combined method (consensus approach)
@@ -252,37 +320,46 @@ class FeatureSelector:
         
         # Clinical features get bonus (lower rank = better)
         clinical_bonus = {f: -10 for f in clinical_features}
+        # Comorbidities get even bigger bonus
+        comorbidity_bonus = {f: -15 for f in self.FORCED_COMORBIDITY_FEATURES}
         
         # Combine ranks
         combined_ranks = {}
         for feat in available_features:
             stat_rank = stat_ranks.get(feat, len(available_features))
             ml_rank = ml_ranks.get(feat, len(available_features))
-            bonus = clinical_bonus.get(feat, 0)
+            bonus = clinical_bonus.get(feat, 0) + comorbidity_bonus.get(feat, 0)
             combined_ranks[feat] = (stat_rank + ml_rank) / 2 + bonus
         
         # Sort by combined rank
         sorted_features = sorted(combined_ranks.items(), key=lambda x: x[1])
         
+        # Start with forced features, then add more by rank
+        selected = forced_features.copy()
+        
         # Check availability if original data provided
         if df_original is not None:
             self.check_availability(df_original, available_features, group_col)
             
-            # Filter out features with high availability disparity
-            filtered = []
+            # Add more features by rank (filter high disparity ones)
             for feat, rank in sorted_features:
+                if feat in selected:
+                    continue
                 if feat in self.availability_by_group:
-                    if not self.availability_by_group[feat].get('flag', False):
-                        filtered.append(feat)
-                else:
-                    filtered.append(feat)
-                
-                if len(filtered) >= n_features:
+                    if self.availability_by_group[feat].get('flag', False):
+                        continue  # Skip high disparity features
+                selected.append(feat)
+                if len(selected) >= n_features:
                     break
             
-            self.selected_features = filtered
+            self.selected_features = selected
         else:
-            self.selected_features = [f[0] for f in sorted_features[:n_features]]
+            for feat, rank in sorted_features:
+                if feat not in selected:
+                    selected.append(feat)
+                if len(selected) >= n_features:
+                    break
+            self.selected_features = selected
         
         # Store importances
         self.feature_importances = {
@@ -306,6 +383,10 @@ class FeatureSelector:
             'clinical_features_included': [
                 f for f in self.selected_features 
                 if f in self.CLINICAL_PRIORITY_FEATURES
+            ],
+            'comorbidity_features_included': [
+                f for f in self.selected_features
+                if f in self.FORCED_COMORBIDITY_FEATURES or f == 'comorbidity_score'
             ],
             'sensitive_features_included': [
                 f for f in self.selected_features 
